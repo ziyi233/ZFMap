@@ -131,13 +131,9 @@ function getGalleryImages(project: Project, galleryType: GalleryType) {
   return galleryType === 'images' ? project.imageUrls || [] : project.floorplanUrls || []
 }
 
-function getPrimaryPrice(project: Project) {
-  return project.price_range || project.jgqj || ''
-}
-
 function getPriceHint(project: Project) {
   if (project.price_range) return '优惠后价格'
-  if (project.jgqj) return '原价格区间（原价）'
+  if (project.jgqj) return '原价格区间'
   return '价格信息'
 }
 
@@ -154,9 +150,9 @@ function formatPriceLines(value: string) {
 }
 
 function getCompactPrice(project: Project) {
-  const price = getPrimaryPrice(project)
-  if (!price) return '价格待补'
-  return formatPriceLines(price)[0] || price
+  if (project.price_range) return formatPriceLines(project.price_range)[0] || project.price_range
+  if (project.jgqj) return `${project.jgqj}（原价）`
+  return '价格待补'
 }
 
 function getOriginalPrice(project: Project) {
