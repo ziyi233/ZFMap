@@ -79,7 +79,6 @@ const AMAP_KEY = import.meta.env.VITE_AMAP_KEY as string | undefined
 const AMAP_SECURITY_CODE = import.meta.env.VITE_AMAP_SECURITY_CODE as string | undefined
 const COMPANY_LOCATION_KEY = 'company_location'
 const SHOW_MARKER_LABELS_KEY = 'show_marker_labels'
-const KEY_MODE_KEY = 'amap_key_mode'
 const MOBILE_BREAKPOINT = 768
 const MOBILE_COLLAPSED_HEIGHT = 88
 const rawData = projectsJson as Project[]
@@ -186,7 +185,13 @@ function KeyModeScreen({ onSelect }: { onSelect: (mode: KeyMode) => void }) {
   )
 }
 
-function AMapConfigScreen({ onConfigSubmit }: { onConfigSubmit: (config: AMapConfig) => void }) {
+function AMapConfigScreen({
+  onBack,
+  onConfigSubmit,
+}: {
+  onBack: () => void
+  onConfigSubmit: (config: AMapConfig) => void
+}) {
   const [apiKey, setApiKey] = useState(localStorage.getItem('amap_key') || '')
   const [securityCode, setSecurityCode] = useState(
     localStorage.getItem('amap_security_code') || '',
@@ -208,7 +213,7 @@ function AMapConfigScreen({ onConfigSubmit }: { onConfigSubmit: (config: AMapCon
             <MapIcon size={32} />
           </div>
         </div>
-        <h2 className="mb-2 text-center text-2xl font-bold text-gray-800">配置高德地图</h2>
+        <h2 className="mb-2 text-center text-2xl font-bold text-gray-800">配置自己的高德地图 Key</h2>
         <p className="mb-8 text-center text-sm text-gray-500">
           填入 Web端 JS API Key 后加载地图和地址解析
         </p>
@@ -257,6 +262,13 @@ function AMapConfigScreen({ onConfigSubmit }: { onConfigSubmit: (config: AMapCon
           <button className="w-full rounded-lg bg-blue-600 py-3 font-medium text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700">
             进入系统
           </button>
+          <button
+            type="button"
+            onClick={onBack}
+            className="w-full rounded-lg border border-gray-200 bg-white py-3 text-sm font-medium text-gray-600 transition hover:bg-gray-50"
+          >
+            返回选择公益 Key
+          </button>
         </form>
       </div>
     </div>
@@ -264,9 +276,7 @@ function AMapConfigScreen({ onConfigSubmit }: { onConfigSubmit: (config: AMapCon
 }
 
 export default function App() {
-  const [keyMode, setKeyMode] = useState<KeyMode | null>(
-    () => (localStorage.getItem(KEY_MODE_KEY) as KeyMode | null) || null,
-  )
+  const [keyMode, setKeyMode] = useState<KeyMode | null>(null)
   const [config, setConfig] = useState<AMapConfig | null>(null)
   const [mapLoaded, setMapLoaded] = useState(false)
   const [companyLocation, setCompanyLocation] = useState<Location | null>(() =>
@@ -323,7 +333,13 @@ export default function App() {
     if (!keyMode) return
 
     if (keyMode === 'public' && AMAP_KEY) {
+      setMapLoaded(false)
       setConfig({ apiKey: AMAP_KEY, securityCode: AMAP_SECURITY_CODE || '' })
+      return
+    }
+
+    if (keyMode === 'public' && !AMAP_KEY) {
+      setConfig(null)
       return
     }
 
@@ -332,7 +348,10 @@ export default function App() {
     const savedKey = localStorage.getItem('amap_key')
     const savedCode = localStorage.getItem('amap_security_code')
     if (savedKey) {
+      setMapLoaded(false)
       setConfig({ apiKey: savedKey, securityCode: savedCode || '' })
+    } else {
+      setConfig(null)
     }
   }, [keyMode])
 
@@ -349,7 +368,9 @@ export default function App() {
     script.onerror = () => {
       alert('地图加载失败，请检查 Key 类型、域名白名单和安全密钥')
       localStorage.removeItem('amap_key')
+      localStorage.removeItem('amap_security_code')
       setConfig(null)
+      setKeyMode(null)
     }
     document.body.appendChild(script)
 
@@ -528,7 +549,6 @@ export default function App() {
   }
 
   const resetConfig = () => {
-    localStorage.removeItem(KEY_MODE_KEY)
     localStorage.removeItem('amap_key')
     localStorage.removeItem('amap_security_code')
     window.location.reload()
@@ -582,9 +602,9 @@ export default function App() {
     return (
       <KeyModeScreen
         onSelect={(mode) => {
-          localStorage.setItem(KEY_MODE_KEY, mode)
           setKeyMode(mode)
           if (mode === 'public' && AMAP_KEY) {
+            setMapLoaded(false)
             setConfig({ apiKey: AMAP_KEY, securityCode: AMAP_SECURITY_CODE || '' })
           }
         }}
@@ -595,9 +615,13 @@ export default function App() {
   if (!config) {
     return (
       <AMapConfigScreen
+        onBack={() => {
+          setKeyMode(null)
+          setConfig(null)
+        }}
         onConfigSubmit={(nextConfig) => {
-          localStorage.setItem(KEY_MODE_KEY, 'custom')
           setKeyMode('custom')
+          setMapLoaded(false)
           setConfig(nextConfig)
         }}
       />
