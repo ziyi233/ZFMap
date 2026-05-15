@@ -95,16 +95,6 @@ function getStoredCompanyLocation() {
   }
 }
 
-function getDefaultMobilePanelHeight() {
-  return Math.round(window.innerHeight * 0.46)
-}
-
-function clampMobilePanelHeight(value: number) {
-  const min = 180
-  const max = Math.round(window.innerHeight * 0.78)
-  return Math.min(Math.max(value, min), max)
-}
-
 function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
   const radius = 6371
   const dLat = ((lat2 - lat1) * Math.PI) / 180
@@ -283,7 +273,6 @@ export default function App() {
     getStoredCompanyLocation(),
   )
   const [searchQuery, setSearchQuery] = useState(() => getStoredCompanyLocation()?.address || '')
-  const [isSearching, setIsSearching] = useState(false)
   const [selectedProperty, setSelectedProperty] = useState<Project | null>(null)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [galleryType, setGalleryType] = useState<GalleryType>('images')
@@ -295,14 +284,11 @@ export default function App() {
   const [isMobileSidebarExpanded, setIsMobileSidebarExpanded] = useState(
     () => window.innerWidth >= MOBILE_BREAKPOINT,
   )
-  const [mobilePanelHeight, setMobilePanelHeight] = useState(() => getDefaultMobilePanelHeight())
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null)
   const mapInstanceRef = useRef<any>(null)
   const markersRef = useRef<any[]>([])
   const companyMarkerRef = useRef<any>(null)
-  const longPressTimerRef = useRef<number | null>(null)
-  const isDraggingRef = useRef(false)
 
   const displayProperties = useMemo(() => {
     if (!companyLocation) return rawData
@@ -318,7 +304,6 @@ export default function App() {
     const handleResize = () => {
       const nextIsMobile = window.innerWidth < MOBILE_BREAKPOINT
       setIsMobile(nextIsMobile)
-      setMobilePanelHeight((value) => clampMobilePanelHeight(value))
       if (!nextIsMobile) {
         setIsMobileSidebarExpanded(true)
       }
@@ -405,7 +390,7 @@ export default function App() {
 
   useEffect(() => {
     mapInstanceRef.current?.resize?.()
-  }, [isMobileSidebarExpanded, mobilePanelHeight])
+  }, [isMobileSidebarExpanded])
 
   useEffect(() => {
     if (!mapLoaded || !window.AMap) return
@@ -519,12 +504,10 @@ export default function App() {
 
   const performSearch = (keyword: string) => {
     if (!window.AMap) return
-    setIsSearching(true)
 
     window.AMap.plugin('AMap.Geocoder', () => {
       const geocoder = new window.AMap.Geocoder({ city: '上海' })
       geocoder.getLocation(keyword, (status: string, result: any) => {
-        setIsSearching(false)
         if (status === 'complete' && result.info === 'OK') {
           const loc = result.geocodes[0].location
           const location = {
@@ -556,34 +539,6 @@ export default function App() {
 
   const openImagePreview = (project: Project, index = currentImageIndex) => {
     setImagePreview({ project, galleryType, index })
-  }
-
-  const handleMobileResizeStart = () => {
-    if (!isMobile || !isMobileSidebarExpanded) return
-
-    const handlePointerMove = (event: PointerEvent) => {
-      if (!isDraggingRef.current) return
-      setMobilePanelHeight(clampMobilePanelHeight(event.clientY))
-    }
-
-    const stopResize = () => {
-      if (longPressTimerRef.current) {
-        window.clearTimeout(longPressTimerRef.current)
-        longPressTimerRef.current = null
-      }
-      isDraggingRef.current = false
-      window.removeEventListener('pointermove', handlePointerMove)
-      window.removeEventListener('pointerup', stopResize)
-      window.removeEventListener('pointercancel', stopResize)
-    }
-
-    window.addEventListener('pointermove', handlePointerMove)
-    window.addEventListener('pointerup', stopResize)
-    window.addEventListener('pointercancel', stopResize)
-
-    longPressTimerRef.current = window.setTimeout(() => {
-      isDraggingRef.current = true
-    }, 220)
   }
 
   const moveImagePreview = (direction: -1 | 1) => {
@@ -634,7 +589,7 @@ export default function App() {
         className="relative z-20 flex w-full shrink-0 flex-col bg-white shadow-[0_4px_24px_rgba(0,0,0,0.06)] md:h-auto md:w-[420px] md:shadow-[4px_0_24px_rgba(0,0,0,0.05)]"
         style={{
           height: isMobile
-            ? `${isMobileSidebarExpanded ? mobilePanelHeight : MOBILE_COLLAPSED_HEIGHT}px`
+            ? `${isMobileSidebarExpanded ? window.innerHeight : MOBILE_COLLAPSED_HEIGHT}px`
             : undefined,
         }}
       >
@@ -649,9 +604,6 @@ export default function App() {
                   type="button"
                   onClick={() => {
                     setIsMobileSidebarExpanded((value) => !value)
-                    if (!isMobileSidebarExpanded) {
-                      setMobilePanelHeight(clampMobilePanelHeight(getDefaultMobilePanelHeight()))
-                    }
                   }}
                   className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-600"
                 >
@@ -672,16 +624,10 @@ export default function App() {
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
                   placeholder="输入办公地点，支持下拉补全"
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pl-10 pr-24 text-sm transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pl-10 pr-4 text-sm transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   autoComplete="off"
                 />
                 <Search className="absolute left-3 top-3.5 text-gray-400" size={16} />
-                <button
-                  disabled={isSearching}
-                  className="absolute bottom-1 right-1 top-1 rounded-lg bg-blue-600 px-4 text-xs font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {isSearching ? '计算中...' : '找最近'}
-                </button>
               </form>
 
               {companyLocation && (
@@ -708,7 +654,7 @@ export default function App() {
           )}
 
           {isMobile && !isMobileSidebarExpanded && (
-            <p className="mt-2 text-xs text-gray-500">展开后可搜索办公地点、查看列表并长按拖动高度</p>
+            <p className="mt-2 text-xs text-gray-500">展开后可搜索办公地点并查看完整项目列表</p>
           )}
         </div>
 
@@ -793,16 +739,6 @@ export default function App() {
               ))}
             </div>
 
-            {isMobile && (
-              <button
-                type="button"
-                onPointerDown={handleMobileResizeStart}
-                className="flex items-center justify-center gap-2 border-t border-gray-100 bg-white py-2 text-[11px] font-medium text-gray-400"
-              >
-                <span className="h-1.5 w-10 rounded-full bg-gray-300" />
-                长按拖动调整区域
-              </button>
-            )}
           </>
         )}
       </div>
