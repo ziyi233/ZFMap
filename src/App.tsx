@@ -299,6 +299,7 @@ export default function App() {
   const mapContainerRef = useRef<HTMLDivElement | null>(null)
   const mapInstanceRef = useRef<any>(null)
   const markersRef = useRef<any[]>([])
+  const markerElementsRef = useRef(new Map<number, HTMLElement>())
   const companyMarkerRef = useRef<any>(null)
   const autoCompleteServiceRef = useRef<any>(null)
   const searchRequestIdRef = useRef(0)
@@ -453,23 +454,22 @@ export default function App() {
 
     mapInstanceRef.current.remove(markersRef.current)
     markersRef.current = []
+    markerElementsRef.current.clear()
 
     displayProperties.forEach((project, index) => {
       const isTop3 = Boolean(companyLocation && index < 3)
-      const isSelected = selectedProperty?.projectId === project.projectId
       const content = document.createElement('div')
       content.className = 'marker-content group cursor-pointer'
+      content.dataset.projectId = String(project.projectId)
 
-      const pinColor = isSelected
-        ? 'bg-blue-600 border-blue-200'
-        : isTop3
+      const pinColor = isTop3
           ? 'bg-orange-500 border-orange-200'
           : 'bg-white border-blue-400'
-      const iconColor = isSelected || isTop3 ? 'text-white' : 'text-blue-500'
+      const iconColor = isTop3 ? 'text-white' : 'text-blue-500'
       const priceText = project.jgqj ? project.jgqj.replace('元', '') : '暂无报价'
 
       content.innerHTML = `
-        <div class="marker-pin w-8 h-8 rounded-full border-[3px] shadow-md flex items-center justify-center transition-transform duration-300 ${isSelected ? 'scale-125 z-50 shadow-xl' : 'hover:scale-110'} ${pinColor}">
+        <div class="marker-pin w-8 h-8 rounded-full border-[3px] shadow-md flex items-center justify-center transition-transform duration-300 hover:scale-110 ${pinColor}">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="${iconColor}">
             <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
             <polyline points="9 22 9 12 15 12 15 22"></polyline>
@@ -495,15 +495,22 @@ export default function App() {
         position: new window.AMap.LngLat(project.x, project.y),
         content,
         offset: new window.AMap.Pixel(-16, -16),
-        zIndex: isSelected ? 100 : isTop3 ? 50 : 10,
+        zIndex: isTop3 ? 50 : 10,
       })
 
       marker.on('mouseover', () => marker.setTop(true))
       marker.on('mouseout', () => marker.setTop(false))
       marker.setMap(mapInstanceRef.current)
       markersRef.current.push(marker)
+      markerElementsRef.current.set(project.projectId, content)
     })
-  }, [companyLocation, displayProperties, mapLoaded, selectedProperty])
+  }, [companyLocation, displayProperties, mapLoaded])
+
+  useEffect(() => {
+    markerElementsRef.current.forEach((element, projectId) => {
+      element.classList.toggle('is-selected', selectedProperty?.projectId === projectId)
+    })
+  }, [selectedProperty])
 
   useEffect(() => {
     document.querySelectorAll('.marker-label').forEach((element) => {
