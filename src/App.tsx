@@ -457,11 +457,11 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-gray-50 font-sans text-gray-800">
-      <div className="relative z-20 flex w-[420px] flex-col bg-white shadow-[4px_0_24px_rgba(0,0,0,0.05)]">
-        <div className="border-b border-gray-100 bg-white p-6">
-          <div className="mb-4 flex items-center justify-between">
-            <h1 className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-xl font-bold text-transparent">
+    <div className="flex h-[100dvh] w-full flex-col overflow-hidden bg-gray-50 font-sans text-gray-800 md:flex-row">
+      <div className="relative z-20 flex h-[48dvh] w-full shrink-0 flex-col bg-white shadow-[0_4px_24px_rgba(0,0,0,0.06)] md:h-auto md:w-[420px] md:shadow-[4px_0_24px_rgba(0,0,0,0.05)]">
+        <div className="border-b border-gray-100 bg-white p-4 md:p-6">
+          <div className="mb-3 flex items-center justify-between md:mb-4">
+            <h1 className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-lg font-bold text-transparent md:text-xl">
               浦东新区低租金青年公寓
             </h1>
             <button onClick={resetConfig} className="text-gray-400 hover:text-gray-600" title="重新配置高德 Key">
@@ -488,7 +488,7 @@ export default function App() {
           </form>
 
           {companyLocation && (
-            <div className="mt-4 flex items-start gap-2 rounded-lg border border-indigo-100 bg-indigo-50 p-3">
+            <div className="mt-3 flex items-start gap-2 rounded-lg border border-indigo-100 bg-indigo-50 p-2.5 md:mt-4 md:p-3">
               <MapPin className="mt-0.5 shrink-0 text-indigo-600" size={16} />
               <div className="text-xs text-indigo-900">
                 <span className="mb-0.5 block font-semibold">办公地点已设定：</span>
@@ -497,7 +497,7 @@ export default function App() {
             </div>
           )}
 
-          <div className="mt-4 flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
+          <div className="mt-3 flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 md:mt-4">
             <span className="text-xs font-medium text-gray-600">地图标点文字</span>
             <button
               type="button"
@@ -509,8 +509,8 @@ export default function App() {
           </div>
         </div>
 
-        <div className="flex-1 space-y-4 overflow-y-auto bg-gray-50/50 p-4">
-          <div className="flex justify-between px-2 pb-1 text-xs font-medium text-gray-500">
+        <div className="flex-1 space-y-3 overflow-y-auto bg-gray-50/50 p-3 md:space-y-4 md:p-4">
+          <div className="flex justify-between gap-3 px-2 pb-1 text-xs font-medium text-gray-500">
             <span>共找到 {displayProperties.length} 个低租金青年公寓项目</span>
             {companyLocation && <span>按距离由近及远排序</span>}
           </div>
@@ -524,14 +524,14 @@ export default function App() {
                 setGalleryType('images')
                 mapInstanceRef.current?.panTo([project.x, project.y])
               }}
-              className={`group cursor-pointer rounded-xl border-2 bg-white p-4 transition-all hover:border-blue-200 hover:shadow-lg ${
+              className={`group cursor-pointer rounded-xl border-2 bg-white p-3 transition-all hover:border-blue-200 hover:shadow-lg md:p-4 ${
                 selectedProperty?.projectId === project.projectId
                   ? 'border-blue-500 shadow-md'
                   : 'border-transparent shadow-sm'
               }`}
             >
-              <div className="flex gap-4">
-                <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+              <div className="flex gap-3 md:gap-4">
+                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-gray-100 md:h-24 md:w-24">
                   {getMainImage(project) ? (
                     <img
                       src={getMainImage(project)}
@@ -589,7 +589,7 @@ export default function App() {
         </div>
       </div>
 
-      <div className="relative flex-1 bg-gray-200">
+      <div className="relative min-h-0 flex-1 bg-gray-200">
         {!mapLoaded && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-gray-100">
             <div className="flex flex-col items-center text-gray-500">
@@ -601,7 +601,7 @@ export default function App() {
         <div ref={mapContainerRef} className="h-full w-full" />
 
         {selectedProperty && (
-          <div className="absolute bottom-4 right-4 top-4 z-30 flex w-[400px] flex-col overflow-hidden rounded-2xl bg-white shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
+          <div className="absolute inset-x-2 bottom-2 top-auto z-30 flex max-h-[88dvh] flex-col overflow-hidden rounded-2xl bg-white shadow-[0_8px_30px_rgb(0,0,0,0.18)] md:inset-y-4 md:left-auto md:right-4 md:w-[400px] md:max-h-none">
             <button
               onClick={() => setSelectedProperty(null)}
               className="absolute right-4 top-4 z-40 rounded-full bg-black/40 p-1.5 text-white backdrop-blur transition hover:bg-black/60"
@@ -609,7 +609,7 @@ export default function App() {
               <X size={18} />
             </button>
 
-            <div className="group relative h-56 shrink-0 bg-gray-100">
+            <div className="group relative h-48 shrink-0 bg-gray-100 md:h-56">
               {getGalleryImages(selectedProperty, galleryType).length ? (
                 <>
                   <img
@@ -658,7 +658,7 @@ export default function App() {
               )}
             </div>
 
-            <div className="flex-1 space-y-6 overflow-y-auto p-6">
+            <div className="flex-1 space-y-5 overflow-y-auto p-4 md:space-y-6 md:p-6">
               <div>
                 <div className="mb-3 grid grid-cols-2 gap-2 rounded-xl bg-gray-100 p-1">
                   <button
@@ -698,7 +698,7 @@ export default function App() {
               </div>
 
               <div>
-                <h2 className="mb-2 text-2xl font-bold text-gray-900">{getProjectName(selectedProperty)}</h2>
+                <h2 className="mb-2 text-xl font-bold text-gray-900 md:text-2xl">{getProjectName(selectedProperty)}</h2>
                 <div className="mb-4 flex flex-wrap gap-2">
                   <span className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-600">
                     {selectedProperty.globaltype2Name || '保障性租赁住房'}
@@ -709,7 +709,7 @@ export default function App() {
                 </div>
                 <div className="rounded-xl border border-red-100 bg-red-50 p-4 text-red-600">
                   <div className="mb-1 text-xs font-medium opacity-80">租金区间</div>
-                  <div className="text-xl font-bold">{selectedProperty.jgqj || '具体咨询运营方'}</div>
+                  <div className="text-lg font-bold md:text-xl">{selectedProperty.jgqj || '具体咨询运营方'}</div>
                 </div>
               </div>
 
@@ -765,7 +765,7 @@ export default function App() {
         )}
 
         {imagePreview && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 p-6">
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 p-4 md:p-6">
             <button
               onClick={() => setImagePreview(null)}
               className="absolute right-5 top-5 rounded-full bg-white/10 p-2 text-white backdrop-blur transition hover:bg-white/20"
@@ -774,7 +774,7 @@ export default function App() {
               <X size={24} />
             </button>
 
-            <div className="absolute left-6 top-5 max-w-[70vw] text-white">
+            <div className="absolute left-4 top-5 max-w-[70vw] text-white md:left-6">
               <div className="text-sm font-semibold">{getProjectName(imagePreview.project)}</div>
               <div className="mt-1 text-xs text-white/70">
                 {imagePreview.galleryType === 'images' ? '实景/外观' : '房型/户型'} {imagePreview.index + 1} / {getGalleryImages(imagePreview.project, imagePreview.galleryType).length}
@@ -785,14 +785,14 @@ export default function App() {
               <>
                 <button
                   onClick={() => moveImagePreview(-1)}
-                  className="absolute left-5 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-3 text-white backdrop-blur transition hover:bg-white/20"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white backdrop-blur transition hover:bg-white/20 md:left-5 md:p-3"
                   aria-label="上一张"
                 >
                   <ChevronLeft size={30} />
                 </button>
                 <button
                   onClick={() => moveImagePreview(1)}
-                  className="absolute right-5 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-3 text-white backdrop-blur transition hover:bg-white/20"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white backdrop-blur transition hover:bg-white/20 md:right-5 md:p-3"
                   aria-label="下一张"
                 >
                   <ChevronRight size={30} />
@@ -803,7 +803,7 @@ export default function App() {
             <img
               src={getGalleryImages(imagePreview.project, imagePreview.galleryType)[imagePreview.index]}
               alt={getProjectName(imagePreview.project)}
-              className="max-h-[86vh] max-w-[92vw] rounded-xl object-contain shadow-2xl"
+              className="max-h-[84dvh] max-w-[94vw] rounded-xl object-contain shadow-2xl md:max-h-[86vh] md:max-w-[92vw]"
             />
           </div>
         )}
