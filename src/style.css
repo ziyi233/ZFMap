@@ -14,3 +14,21 @@ input,
 button {
   -webkit-tap-highlight-color: transparent;
 }
+
+.marker-content {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+}
+
+.marker-pin {
+  position: relative;
+  z-index: 1;
+}
+
+.marker-label {
+  z-index: 2;
+}

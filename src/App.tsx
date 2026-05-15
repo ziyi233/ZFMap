@@ -458,7 +458,7 @@ export default function App() {
       const isTop3 = Boolean(companyLocation && index < 3)
       const isSelected = selectedProperty?.projectId === project.projectId
       const content = document.createElement('div')
-      content.className = 'relative group cursor-pointer flex justify-center items-center'
+      content.className = 'marker-content group cursor-pointer'
 
       const pinColor = isSelected
         ? 'bg-blue-600 border-blue-200'
@@ -469,13 +469,13 @@ export default function App() {
       const priceText = project.jgqj ? project.jgqj.replace('元', '') : '暂无报价'
 
       content.innerHTML = `
-        <div class="w-8 h-8 rounded-full border-[3px] shadow-md flex items-center justify-center transition-transform duration-300 ${isSelected ? 'scale-125 z-50 shadow-xl' : 'hover:scale-110'} ${pinColor}">
+        <div class="marker-pin w-8 h-8 rounded-full border-[3px] shadow-md flex items-center justify-center transition-transform duration-300 ${isSelected ? 'scale-125 z-50 shadow-xl' : 'hover:scale-110'} ${pinColor}">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="${iconColor}">
             <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
             <polyline points="9 22 9 12 15 12 15 22"></polyline>
           </svg>
         </div>
-        <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 ${showMarkerLabels ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity duration-200 pointer-events-none z-[100] min-w-max">
+        <div class="marker-label absolute bottom-full left-1/2 -translate-x-1/2 mb-2 ${showMarkerLabels ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity duration-200 pointer-events-none z-[100] min-w-max">
           <div class="bg-gray-800/90 text-white text-xs font-medium px-3 py-2 rounded-lg shadow-xl whitespace-nowrap flex flex-col items-center backdrop-blur">
             <span class="block mb-1 text-[13px]">${getProjectName(project)}</span>
             <span class="text-orange-300 font-bold">¥ ${priceText}</span>
