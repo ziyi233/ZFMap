@@ -147,6 +147,20 @@ function getPriceFallback(project: Project) {
   return '价格待补充，请联系运营方'
 }
 
+function formatPriceLines(value: string) {
+  return value
+    .replace(/\s+/g, '')
+    .replace(/(?=\d+(?:\.\d+)?-\d+(?:\.\d+)?元\/月（(?:次年|第三年)）)/g, '\n')
+    .split('\n')
+    .filter(Boolean)
+}
+
+function getCompactPrice(project: Project) {
+  const price = getPrimaryPrice(project)
+  if (!price) return '价格待补'
+  return formatPriceLines(price)[0] || price
+}
+
 function getOriginalPrice(project: Project) {
   return project.jgqj || ''
 }
@@ -487,7 +501,7 @@ export default function App() {
           ? 'bg-orange-500 border-orange-200'
           : 'bg-white border-blue-400'
       const iconColor = isTop3 ? 'text-white' : 'text-blue-500'
-      const priceText = getPrimaryPrice(project) || '价格待补'
+      const priceText = getCompactPrice(project)
 
       content.innerHTML = `
         <div class="marker-pin w-8 h-8 rounded-full border-[3px] shadow-md flex items-center justify-center transition-transform duration-300 hover:scale-110 ${pinColor}">
@@ -809,7 +823,11 @@ export default function App() {
                         )}
                       </div>
 
-                      <div className="mt-2 text-sm font-bold text-red-500">{getPriceFallback(project)}</div>
+                      <div className="mt-2 space-y-0.5 text-sm font-bold leading-snug text-red-500">
+                        {formatPriceLines(getPriceFallback(project)).map((line) => (
+                          <div key={line}>{line}</div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -940,7 +958,11 @@ export default function App() {
                 </div>
                 <div className="rounded-xl border border-red-100 bg-red-50 p-4 text-red-600">
                   <div className="mb-1 text-xs font-medium opacity-80">{getPriceHint(selectedProperty)}</div>
-                  <div className="text-lg font-bold md:text-xl">{getPriceFallback(selectedProperty)}</div>
+                  <div className="space-y-1 text-lg font-bold leading-snug md:text-xl">
+                    {formatPriceLines(getPriceFallback(selectedProperty)).map((line) => (
+                      <div key={line}>{line}</div>
+                    ))}
+                  </div>
                   {selectedProperty.price_range && getOriginalPrice(selectedProperty) && (
                     <div className="mt-2 text-xs font-medium text-red-500/75">
                       原价格区间：{getOriginalPrice(selectedProperty)}
