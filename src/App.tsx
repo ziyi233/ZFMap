@@ -475,7 +475,7 @@ export default function App() {
             <polyline points="9 22 9 12 15 12 15 22"></polyline>
           </svg>
         </div>
-        <div class="marker-label absolute bottom-full left-1/2 -translate-x-1/2 mb-2 ${showMarkerLabels ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity duration-200 pointer-events-none z-[100] min-w-max">
+        <div class="marker-label${showMarkerLabels ? ' is-visible' : ''} absolute bottom-full left-1/2 -translate-x-1/2 mb-2 transition-opacity duration-200 pointer-events-none z-[100] min-w-max">
           <div class="bg-gray-800/90 text-white text-xs font-medium px-3 py-2 rounded-lg shadow-xl whitespace-nowrap flex flex-col items-center backdrop-blur">
             <span class="block mb-1 text-[13px]">${getProjectName(project)}</span>
             <span class="text-orange-300 font-bold">¥ ${priceText}</span>
@@ -503,7 +503,13 @@ export default function App() {
       marker.setMap(mapInstanceRef.current)
       markersRef.current.push(marker)
     })
-  }, [companyLocation, displayProperties, mapLoaded, selectedProperty, showMarkerLabels])
+  }, [companyLocation, displayProperties, mapLoaded, selectedProperty])
+
+  useEffect(() => {
+    document.querySelectorAll('.marker-label').forEach((element) => {
+      element.classList.toggle('is-visible', showMarkerLabels)
+    })
+  }, [showMarkerLabels])
 
   const updateCompanyMarker = (location: Location) => {
     if (!mapInstanceRef.current || !window.AMap) return

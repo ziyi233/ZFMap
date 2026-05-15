@@ -31,4 +31,10 @@ button {
 
 .marker-label {
   z-index: 2;
+  opacity: 0;
+}
+
+.marker-label.is-visible,
+.marker-content:hover .marker-label {
+  opacity: 1;
 }
