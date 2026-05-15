@@ -40,6 +40,15 @@ type Location = {
   address: string
 }
 
+type SearchSuggestion = {
+  id: string
+  name: string
+  address: string
+  district?: string
+  lat: number
+  lng: number
+}
+
 type Project = {
   rzzg?: string
   globaltype2Name?: string
@@ -273,6 +282,8 @@ export default function App() {
     getStoredCompanyLocation(),
   )
   const [searchQuery, setSearchQuery] = useState(() => getStoredCompanyLocation()?.address || '')
+  const [searchSuggestions, setSearchSuggestions] = useState<SearchSuggestion[]>([])
+  const [isSearchFocused, setIsSearchFocused] = useState(false)
   const [selectedProperty, setSelectedProperty] = useState<Project | null>(null)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [galleryType, setGalleryType] = useState<GalleryType>('images')
@@ -289,6 +300,8 @@ export default function App() {
   const mapInstanceRef = useRef<any>(null)
   const markersRef = useRef<any[]>([])
   const companyMarkerRef = useRef<any>(null)
+  const autoCompleteServiceRef = useRef<any>(null)
+  const searchRequestIdRef = useRef(0)
 
   const displayProperties = useMemo(() => {
     if (!companyLocation) return rawData
@@ -347,7 +360,7 @@ export default function App() {
     }
 
     const script = document.createElement('script')
-    script.src = `https://webapi.amap.com/maps?v=2.0&key=${config.apiKey}&plugin=AMap.Geocoder,AMap.AutoComplete`
+    script.src = `https://webapi.amap.com/maps?v=2.0&key=${config.apiKey}&plugin=AMap.AutoComplete`
     script.async = true
     script.onload = () => setMapLoaded(true)
     script.onerror = () => {
@@ -395,28 +408,45 @@ export default function App() {
   useEffect(() => {
     if (!mapLoaded || !window.AMap) return
 
-    window.AMap.plugin(['AMap.AutoComplete', 'AMap.Geocoder'], () => {
-      const autoComplete = new window.AMap.AutoComplete({
-        input: 'search-input-amap',
-        city: '上海',
-      })
-
-      autoComplete.on('select', (event: any) => {
-        if (event.poi?.location) {
-          const location = {
-            lat: event.poi.location.lat,
-            lng: event.poi.location.lng,
-            address: event.poi.name || event.poi.address,
-          }
-          setCompanyLocation(location)
-          setSearchQuery(event.poi.name)
-          updateCompanyMarker(location)
-        } else if (event.poi?.name) {
-          performSearch(event.poi.name)
-        }
-      })
+    window.AMap.plugin('AMap.AutoComplete', () => {
+      autoCompleteServiceRef.current = new window.AMap.AutoComplete({ city: '上海' })
     })
   }, [mapLoaded])
+
+  useEffect(() => {
+    if (!mapLoaded || !autoCompleteServiceRef.current || !isSearchFocused) return
+
+    const keyword = searchQuery.trim()
+    if (!keyword || keyword === companyLocation?.address) {
+      setSearchSuggestions([])
+      return
+    }
+
+    const requestId = searchRequestIdRef.current + 1
+    searchRequestIdRef.current = requestId
+
+    autoCompleteServiceRef.current.search(keyword, (status: string, result: any) => {
+      if (requestId !== searchRequestIdRef.current) return
+      if (status !== 'complete' || !Array.isArray(result.tips)) {
+        setSearchSuggestions([])
+        return
+      }
+
+      const suggestions = result.tips
+        .filter((tip: any) => tip.location && typeof tip.location.lng === 'number')
+        .slice(0, 8)
+        .map((tip: any, index: number) => ({
+          id: `${tip.id || tip.name}-${index}`,
+          name: tip.name,
+          address: tip.address || tip.district || '上海',
+          district: tip.district,
+          lat: tip.location.lat,
+          lng: tip.location.lng,
+        }))
+
+      setSearchSuggestions(suggestions)
+    })
+  }, [companyLocation?.address, isSearchFocused, mapLoaded, searchQuery])
 
   useEffect(() => {
     if (!mapLoaded || !window.AMap || !mapInstanceRef.current) return
@@ -502,33 +532,24 @@ export default function App() {
     mapInstanceRef.current.setZoom(13)
   }
 
-  const performSearch = (keyword: string) => {
-    if (!window.AMap) return
-
-    window.AMap.plugin('AMap.Geocoder', () => {
-      const geocoder = new window.AMap.Geocoder({ city: '上海' })
-      geocoder.getLocation(keyword, (status: string, result: any) => {
-        if (status === 'complete' && result.info === 'OK') {
-          const loc = result.geocodes[0].location
-          const location = {
-            lat: loc.lat,
-            lng: loc.lng,
-            address: result.geocodes[0].formattedAddress,
-          }
-          setCompanyLocation(location)
-          setSearchQuery(keyword)
-          updateCompanyMarker(location)
-        } else {
-          alert('地址解析失败，请输入更详细的上海地址，或检查高德安全密钥')
-        }
-      })
-    })
+  const selectSearchSuggestion = (suggestion: SearchSuggestion) => {
+    const location = {
+      lat: suggestion.lat,
+      lng: suggestion.lng,
+      address: `${suggestion.name}${suggestion.address ? ` · ${suggestion.address}` : ''}`,
+    }
+    setCompanyLocation(location)
+    setSearchQuery(location.address)
+    setSearchSuggestions([])
+    setIsSearchFocused(false)
+    updateCompanyMarker(location)
   }
 
   const handleSearchSubmit = (event: FormEvent) => {
     event.preventDefault()
-    if (!searchQuery.trim()) return
-    performSearch(searchQuery.trim())
+    if (searchSuggestions[0]) {
+      selectSearchSuggestion(searchSuggestions[0])
+    }
   }
 
   const resetConfig = () => {
@@ -622,12 +643,34 @@ export default function App() {
                 <input
                   id="search-input-amap"
                   value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="输入办公地点，支持下拉补全"
+                  onChange={(event) => {
+                    setSearchQuery(event.target.value)
+                    setIsSearchFocused(true)
+                  }}
+                  onFocus={() => setIsSearchFocused(true)}
+                  placeholder="输入办公地点后选择候选项"
                   className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pl-10 pr-4 text-sm transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   autoComplete="off"
                 />
                 <Search className="absolute left-3 top-3.5 text-gray-400" size={16} />
+                {searchSuggestions.length > 0 && (
+                  <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-xl">
+                    {searchSuggestions.map((suggestion) => (
+                      <button
+                        key={suggestion.id}
+                        type="button"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => selectSearchSuggestion(suggestion)}
+                        className="block w-full border-b border-gray-50 px-4 py-3 text-left transition last:border-b-0 hover:bg-blue-50"
+                      >
+                        <span className="block text-sm font-semibold text-gray-900">{suggestion.name}</span>
+                        <span className="mt-0.5 block truncate text-xs text-gray-500">
+                          {suggestion.district ? `${suggestion.district} · ` : ''}{suggestion.address}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </form>
 
               {companyLocation && (
