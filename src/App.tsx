@@ -137,22 +137,20 @@ function getPrimaryPrice(project: Project) {
 
 function getPriceHint(project: Project) {
   if (project.price_range) return '优惠后价格'
-  if (project.jgqj) return '原价格区间'
+  if (project.jgqj) return '原价格区间（原价）'
   return '价格信息'
 }
 
 function getPriceFallback(project: Project) {
   if (project.price_range) return project.price_range
-  if (project.jgqj) return project.jgqj
+  if (project.jgqj) return `${project.jgqj}（原价）`
   return '价格待补充，请联系运营方'
 }
 
 function formatPriceLines(value: string) {
-  return value
-    .replace(/\s+/g, '')
-    .replace(/(?=\d+(?:\.\d+)?-\d+(?:\.\d+)?元\/月（(?:次年|第三年)）)/g, '\n')
-    .split('\n')
-    .filter(Boolean)
+  const compact = value.replace(/\s+/g, '')
+  const matches = compact.match(/\d+(?:\.\d+)?(?:-\d+(?:\.\d+)?)?元\/月（(?:首年|次年|第三年)）/g)
+  return matches?.length ? matches : [value]
 }
 
 function getCompactPrice(project: Project) {
@@ -965,7 +963,7 @@ export default function App() {
                   </div>
                   {selectedProperty.price_range && getOriginalPrice(selectedProperty) && (
                     <div className="mt-2 text-xs font-medium text-red-500/75">
-                      原价格区间：{getOriginalPrice(selectedProperty)}
+                      原价格区间：{getOriginalPrice(selectedProperty)}（原价）
                     </div>
                   )}
                 </div>
@@ -1013,7 +1011,7 @@ export default function App() {
 
               {selectedProperty.fhxjgqj && (
                 <div>
-                  <h3 className="mb-3 text-base font-bold text-gray-900">户型与原价格明细</h3>
+                  <h3 className="mb-3 text-base font-bold text-gray-900">户型与价格明细（原价）</h3>
                   <div className="space-y-2">
                     {selectedProperty.fhxjgqj.split(',').map((item) => {
                       const [type, price] = item.split('：')
@@ -1021,7 +1019,7 @@ export default function App() {
                       return (
                         <div key={item} className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
                           <span className="text-sm font-medium text-gray-700">{type}</span>
-                          <span className="text-sm font-bold text-red-500">{price}</span>
+                          <span className="text-sm font-bold text-red-500">{price}（原价）</span>
                         </div>
                       )
                     })}
