@@ -65,6 +65,7 @@ type Project = {
   streetOfficeName?: string
   lxdh?: string
   jgqj?: string
+  vrUrl?: string
   x: number
   y: number
   location: string
@@ -128,6 +129,22 @@ function getMainImage(project: Project) {
 
 function getGalleryImages(project: Project, galleryType: GalleryType) {
   return galleryType === 'images' ? project.imageUrls || [] : project.floorplanUrls || []
+}
+
+function getPrimaryPrice(project: Project) {
+  return project.jgqj || project.price_range || ''
+}
+
+function getPriceHint(project: Project) {
+  if (project.jgqj) return '参考租金区间'
+  if (project.price_range) return '优惠租金说明'
+  return '价格信息'
+}
+
+function getPriceFallback(project: Project) {
+  if (project.jgqj) return project.jgqj
+  if (project.price_range) return project.price_range
+  return '价格待补充，请联系运营方'
 }
 
 function KeyModeScreen({ onSelect }: { onSelect: (mode: KeyMode) => void }) {
@@ -466,7 +483,7 @@ export default function App() {
           ? 'bg-orange-500 border-orange-200'
           : 'bg-white border-blue-400'
       const iconColor = isTop3 ? 'text-white' : 'text-blue-500'
-      const priceText = project.jgqj ? project.jgqj.replace('元', '') : '暂无报价'
+      const priceText = getPrimaryPrice(project) || '价格待补'
 
       content.innerHTML = `
         <div class="marker-pin w-8 h-8 rounded-full border-[3px] shadow-md flex items-center justify-center transition-transform duration-300 hover:scale-110 ${pinColor}">
@@ -478,7 +495,7 @@ export default function App() {
         <div class="marker-label${showMarkerLabels ? ' is-visible' : ''} absolute bottom-full left-1/2 -translate-x-1/2 mb-2 transition-opacity duration-200 pointer-events-none z-[100] min-w-max">
           <div class="bg-gray-800/90 text-white text-xs font-medium px-3 py-2 rounded-lg shadow-xl whitespace-nowrap flex flex-col items-center backdrop-blur">
             <span class="block mb-1 text-[13px]">${getProjectName(project)}</span>
-            <span class="text-orange-300 font-bold">¥ ${priceText}</span>
+            <span class="text-orange-300 font-bold">${priceText}</span>
             <div class="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-gray-800"></div>
           </div>
         </div>
@@ -788,7 +805,7 @@ export default function App() {
                         )}
                       </div>
 
-                      <div className="mt-2 text-sm font-bold text-red-500">{project.jgqj || '暂无报价'}</div>
+                      <div className="mt-2 text-sm font-bold text-red-500">{getPriceFallback(project)}</div>
                     </div>
                   </div>
                 </div>
@@ -918,9 +935,19 @@ export default function App() {
                   </span>
                 </div>
                 <div className="rounded-xl border border-red-100 bg-red-50 p-4 text-red-600">
-                  <div className="mb-1 text-xs font-medium opacity-80">租金区间</div>
-                  <div className="text-lg font-bold md:text-xl">{selectedProperty.jgqj || '具体咨询运营方'}</div>
+                  <div className="mb-1 text-xs font-medium opacity-80">{getPriceHint(selectedProperty)}</div>
+                  <div className="text-lg font-bold md:text-xl">{getPriceFallback(selectedProperty)}</div>
                 </div>
+                {selectedProperty.vrUrl && (
+                  <a
+                    href={selectedProperty.vrUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-3 inline-flex w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
+                  >
+                    VR 看房
+                  </a>
+                )}
               </div>
 
               <InfoRow icon={<Navigation size={18} />} label="详细地址">
