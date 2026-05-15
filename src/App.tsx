@@ -132,19 +132,23 @@ function getGalleryImages(project: Project, galleryType: GalleryType) {
 }
 
 function getPrimaryPrice(project: Project) {
-  return project.jgqj || project.price_range || ''
+  return project.price_range || project.jgqj || ''
 }
 
 function getPriceHint(project: Project) {
-  if (project.jgqj) return '参考租金区间'
-  if (project.price_range) return '优惠租金说明'
+  if (project.price_range) return '优惠后价格'
+  if (project.jgqj) return '原价格区间'
   return '价格信息'
 }
 
 function getPriceFallback(project: Project) {
-  if (project.jgqj) return project.jgqj
   if (project.price_range) return project.price_range
+  if (project.jgqj) return project.jgqj
   return '价格待补充，请联系运营方'
+}
+
+function getOriginalPrice(project: Project) {
+  return project.jgqj || ''
 }
 
 function KeyModeScreen({ onSelect }: { onSelect: (mode: KeyMode) => void }) {
@@ -937,6 +941,11 @@ export default function App() {
                 <div className="rounded-xl border border-red-100 bg-red-50 p-4 text-red-600">
                   <div className="mb-1 text-xs font-medium opacity-80">{getPriceHint(selectedProperty)}</div>
                   <div className="text-lg font-bold md:text-xl">{getPriceFallback(selectedProperty)}</div>
+                  {selectedProperty.price_range && getOriginalPrice(selectedProperty) && (
+                    <div className="mt-2 text-xs font-medium text-red-500/75">
+                      原价格区间：{getOriginalPrice(selectedProperty)}
+                    </div>
+                  )}
                 </div>
                 {selectedProperty.vrUrl && (
                   <a
@@ -982,7 +991,7 @@ export default function App() {
 
               {selectedProperty.fhxjgqj && (
                 <div>
-                  <h3 className="mb-3 text-base font-bold text-gray-900">户型与价格明细</h3>
+                  <h3 className="mb-3 text-base font-bold text-gray-900">户型与原价格明细</h3>
                   <div className="space-y-2">
                     {selectedProperty.fhxjgqj.split(',').map((item) => {
                       const [type, price] = item.split('：')
