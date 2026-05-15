@@ -32,6 +32,8 @@ type AMapConfig = {
   securityCode: string
 }
 
+type KeyMode = 'public' | 'custom'
+
 type Location = {
   lat: number
   lng: number
@@ -77,6 +79,9 @@ const AMAP_KEY = import.meta.env.VITE_AMAP_KEY as string | undefined
 const AMAP_SECURITY_CODE = import.meta.env.VITE_AMAP_SECURITY_CODE as string | undefined
 const COMPANY_LOCATION_KEY = 'company_location'
 const SHOW_MARKER_LABELS_KEY = 'show_marker_labels'
+const KEY_MODE_KEY = 'amap_key_mode'
+const MOBILE_BREAKPOINT = 768
+const MOBILE_COLLAPSED_HEIGHT = 88
 const rawData = projectsJson as Project[]
 
 function getStoredCompanyLocation() {
@@ -89,6 +94,16 @@ function getStoredCompanyLocation() {
   } catch {
     return null
   }
+}
+
+function getDefaultMobilePanelHeight() {
+  return Math.round(window.innerHeight * 0.46)
+}
+
+function clampMobilePanelHeight(value: number) {
+  const min = 180
+  const max = Math.round(window.innerHeight * 0.78)
+  return Math.min(Math.max(value, min), max)
 }
 
 function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -115,6 +130,60 @@ function getMainImage(project: Project) {
 
 function getGalleryImages(project: Project, galleryType: GalleryType) {
   return galleryType === 'images' ? project.imageUrls || [] : project.floorplanUrls || []
+}
+
+function KeyModeScreen({ onSelect }: { onSelect: (mode: KeyMode) => void }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+      <div className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-xl md:p-8">
+        <div className="mb-6 flex justify-center">
+          <div className="rounded-full bg-blue-100 p-3 text-blue-600">
+            <MapIcon size={32} />
+          </div>
+        </div>
+        <h2 className="mb-2 text-center text-2xl font-bold text-gray-900">选择地图 Key 使用方式</h2>
+        <p className="mx-auto mb-6 max-w-lg text-center text-sm leading-relaxed text-gray-500">
+          公益 Key 用于公共访问，已在高德控制台启用域名白名单，只允许本站域名调用；如果你希望使用自己的额度，也可以填写自己的 Web端 JS API Key
+        </p>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <button
+            type="button"
+            disabled={!AMAP_KEY}
+            onClick={() => onSelect('public')}
+            className="rounded-2xl border border-blue-100 bg-blue-50 p-5 text-left transition hover:border-blue-300 hover:bg-blue-100 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-50 disabled:opacity-60"
+          >
+            <div className="mb-3 inline-flex rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white">
+              推荐
+            </div>
+            <h3 className="mb-2 text-lg font-bold text-gray-900">使用公益 Key</h3>
+            <p className="text-sm leading-relaxed text-gray-600">
+              直接进入地图。公益 Key 已配置域名白名单，适合普通访问和部署后的公共服务
+            </p>
+            {!AMAP_KEY && (
+              <p className="mt-3 text-xs font-medium text-red-500">
+                当前部署环境没有配置 VITE_AMAP_KEY，暂不可用
+              </p>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onSelect('custom')}
+            className="rounded-2xl border border-gray-200 bg-white p-5 text-left transition hover:border-gray-300 hover:bg-gray-50"
+          >
+            <div className="mb-3 inline-flex rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+              自定义
+            </div>
+            <h3 className="mb-2 text-lg font-bold text-gray-900">使用自己的 Key</h3>
+            <p className="text-sm leading-relaxed text-gray-600">
+              填写你自己的高德 Web端 JS API Key 和安全密钥，额度和域名白名单由你自己控制
+            </p>
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function AMapConfigScreen({ onConfigSubmit }: { onConfigSubmit: (config: AMapConfig) => void }) {
@@ -195,6 +264,9 @@ function AMapConfigScreen({ onConfigSubmit }: { onConfigSubmit: (config: AMapCon
 }
 
 export default function App() {
+  const [keyMode, setKeyMode] = useState<KeyMode | null>(
+    () => (localStorage.getItem(KEY_MODE_KEY) as KeyMode | null) || null,
+  )
   const [config, setConfig] = useState<AMapConfig | null>(null)
   const [mapLoaded, setMapLoaded] = useState(false)
   const [companyLocation, setCompanyLocation] = useState<Location | null>(() =>
@@ -209,11 +281,18 @@ export default function App() {
   const [showMarkerLabels, setShowMarkerLabels] = useState(
     () => localStorage.getItem(SHOW_MARKER_LABELS_KEY) !== 'false',
   )
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < MOBILE_BREAKPOINT)
+  const [isMobileSidebarExpanded, setIsMobileSidebarExpanded] = useState(
+    () => window.innerWidth >= MOBILE_BREAKPOINT,
+  )
+  const [mobilePanelHeight, setMobilePanelHeight] = useState(() => getDefaultMobilePanelHeight())
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null)
   const mapInstanceRef = useRef<any>(null)
   const markersRef = useRef<any[]>([])
   const companyMarkerRef = useRef<any>(null)
+  const longPressTimerRef = useRef<number | null>(null)
+  const isDraggingRef = useRef(false)
 
   const displayProperties = useMemo(() => {
     if (!companyLocation) return rawData
@@ -226,17 +305,36 @@ export default function App() {
   }, [companyLocation])
 
   useEffect(() => {
-    if (AMAP_KEY) {
+    const handleResize = () => {
+      const nextIsMobile = window.innerWidth < MOBILE_BREAKPOINT
+      setIsMobile(nextIsMobile)
+      setMobilePanelHeight((value) => clampMobilePanelHeight(value))
+      if (!nextIsMobile) {
+        setIsMobileSidebarExpanded(true)
+      }
+    }
+
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  useEffect(() => {
+    if (!keyMode) return
+
+    if (keyMode === 'public' && AMAP_KEY) {
       setConfig({ apiKey: AMAP_KEY, securityCode: AMAP_SECURITY_CODE || '' })
       return
     }
+
+    if (keyMode !== 'custom') return
 
     const savedKey = localStorage.getItem('amap_key')
     const savedCode = localStorage.getItem('amap_security_code')
     if (savedKey) {
       setConfig({ apiKey: savedKey, securityCode: savedCode || '' })
     }
-  }, [])
+  }, [keyMode])
 
   useEffect(() => {
     if (!config || mapLoaded) return
@@ -283,6 +381,10 @@ export default function App() {
     if (!mapLoaded || !companyLocation) return
     updateCompanyMarker(companyLocation)
   }, [companyLocation, mapLoaded])
+
+  useEffect(() => {
+    mapInstanceRef.current?.resize?.()
+  }, [isMobileSidebarExpanded, mobilePanelHeight])
 
   useEffect(() => {
     if (!mapLoaded || !window.AMap) return
@@ -426,11 +528,7 @@ export default function App() {
   }
 
   const resetConfig = () => {
-    if (AMAP_KEY) {
-      alert('当前使用部署环境变量中的高德 Key，无需重新配置')
-      return
-    }
-
+    localStorage.removeItem(KEY_MODE_KEY)
     localStorage.removeItem('amap_key')
     localStorage.removeItem('amap_security_code')
     window.location.reload()
@@ -438,6 +536,34 @@ export default function App() {
 
   const openImagePreview = (project: Project, index = currentImageIndex) => {
     setImagePreview({ project, galleryType, index })
+  }
+
+  const handleMobileResizeStart = () => {
+    if (!isMobile || !isMobileSidebarExpanded) return
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (!isDraggingRef.current) return
+      setMobilePanelHeight(clampMobilePanelHeight(event.clientY))
+    }
+
+    const stopResize = () => {
+      if (longPressTimerRef.current) {
+        window.clearTimeout(longPressTimerRef.current)
+        longPressTimerRef.current = null
+      }
+      isDraggingRef.current = false
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', stopResize)
+      window.removeEventListener('pointercancel', stopResize)
+    }
+
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', stopResize)
+    window.addEventListener('pointercancel', stopResize)
+
+    longPressTimerRef.current = window.setTimeout(() => {
+      isDraggingRef.current = true
+    }, 220)
   }
 
   const moveImagePreview = (direction: -1 | 1) => {
@@ -452,141 +578,209 @@ export default function App() {
     })
   }
 
+  if (!keyMode) {
+    return (
+      <KeyModeScreen
+        onSelect={(mode) => {
+          localStorage.setItem(KEY_MODE_KEY, mode)
+          setKeyMode(mode)
+          if (mode === 'public' && AMAP_KEY) {
+            setConfig({ apiKey: AMAP_KEY, securityCode: AMAP_SECURITY_CODE || '' })
+          }
+        }}
+      />
+    )
+  }
+
   if (!config) {
-    return <AMapConfigScreen onConfigSubmit={setConfig} />
+    return (
+      <AMapConfigScreen
+        onConfigSubmit={(nextConfig) => {
+          localStorage.setItem(KEY_MODE_KEY, 'custom')
+          setKeyMode('custom')
+          setConfig(nextConfig)
+        }}
+      />
+    )
   }
 
   return (
     <div className="flex h-[100dvh] w-full flex-col overflow-hidden bg-gray-50 font-sans text-gray-800 md:flex-row">
-      <div className="relative z-20 flex h-[48dvh] w-full shrink-0 flex-col bg-white shadow-[0_4px_24px_rgba(0,0,0,0.06)] md:h-auto md:w-[420px] md:shadow-[4px_0_24px_rgba(0,0,0,0.05)]">
+      <div
+        className="relative z-20 flex w-full shrink-0 flex-col bg-white shadow-[0_4px_24px_rgba(0,0,0,0.06)] md:h-auto md:w-[420px] md:shadow-[4px_0_24px_rgba(0,0,0,0.05)]"
+        style={{
+          height: isMobile
+            ? `${isMobileSidebarExpanded ? mobilePanelHeight : MOBILE_COLLAPSED_HEIGHT}px`
+            : undefined,
+        }}
+      >
         <div className="border-b border-gray-100 bg-white p-4 md:p-6">
           <div className="mb-3 flex items-center justify-between md:mb-4">
             <h1 className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-lg font-bold text-transparent md:text-xl">
               浦东新区低租金青年公寓
             </h1>
-            <button onClick={resetConfig} className="text-gray-400 hover:text-gray-600" title="重新配置高德 Key">
-              <Settings size={18} />
-            </button>
+            <div className="flex items-center gap-2">
+              {isMobile && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileSidebarExpanded((value) => !value)
+                    if (!isMobileSidebarExpanded) {
+                      setMobilePanelHeight(clampMobilePanelHeight(getDefaultMobilePanelHeight()))
+                    }
+                  }}
+                  className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-600"
+                >
+                  {isMobileSidebarExpanded ? '收起' : '展开'}
+                </button>
+              )}
+              <button onClick={resetConfig} className="text-gray-400 hover:text-gray-600" title="重新配置高德 Key">
+                <Settings size={18} />
+              </button>
+            </div>
           </div>
 
-          <form onSubmit={handleSearchSubmit} className="relative">
-            <input
-              id="search-input-amap"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="输入办公地点，支持下拉补全"
-              className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pl-10 pr-24 text-sm transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              autoComplete="off"
-            />
-            <Search className="absolute left-3 top-3.5 text-gray-400" size={16} />
-            <button
-              disabled={isSearching}
-              className="absolute bottom-1 right-1 top-1 rounded-lg bg-blue-600 px-4 text-xs font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
-            >
-              {isSearching ? '计算中...' : '找最近'}
-            </button>
-          </form>
+          {(!isMobile || isMobileSidebarExpanded) && (
+            <>
+              <form onSubmit={handleSearchSubmit} className="relative">
+                <input
+                  id="search-input-amap"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="输入办公地点，支持下拉补全"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pl-10 pr-24 text-sm transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  autoComplete="off"
+                />
+                <Search className="absolute left-3 top-3.5 text-gray-400" size={16} />
+                <button
+                  disabled={isSearching}
+                  className="absolute bottom-1 right-1 top-1 rounded-lg bg-blue-600 px-4 text-xs font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {isSearching ? '计算中...' : '找最近'}
+                </button>
+              </form>
 
-          {companyLocation && (
-            <div className="mt-3 flex items-start gap-2 rounded-lg border border-indigo-100 bg-indigo-50 p-2.5 md:mt-4 md:p-3">
-              <MapPin className="mt-0.5 shrink-0 text-indigo-600" size={16} />
-              <div className="text-xs text-indigo-900">
-                <span className="mb-0.5 block font-semibold">办公地点已设定：</span>
-                <span className="text-indigo-700 opacity-80">{companyLocation.address}</span>
+              {companyLocation && (
+                <div className="mt-3 flex items-start gap-2 rounded-lg border border-indigo-100 bg-indigo-50 p-2.5 md:mt-4 md:p-3">
+                  <MapPin className="mt-0.5 shrink-0 text-indigo-600" size={16} />
+                  <div className="text-xs text-indigo-900">
+                    <span className="mb-0.5 block font-semibold">办公地点已设定：</span>
+                    <span className="text-indigo-700 opacity-80">{companyLocation.address}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-3 flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 md:mt-4">
+                <span className="text-xs font-medium text-gray-600">地图标点文字</span>
+                <button
+                  type="button"
+                  onClick={() => setShowMarkerLabels((value) => !value)}
+                  className={`rounded-full px-3 py-1 text-xs font-semibold transition ${showMarkerLabels ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 shadow-sm'}`}
+                >
+                  {showMarkerLabels ? '显示中' : '已隐藏'}
+                </button>
               </div>
-            </div>
+            </>
           )}
 
-          <div className="mt-3 flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 md:mt-4">
-            <span className="text-xs font-medium text-gray-600">地图标点文字</span>
-            <button
-              type="button"
-              onClick={() => setShowMarkerLabels((value) => !value)}
-              className={`rounded-full px-3 py-1 text-xs font-semibold transition ${showMarkerLabels ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 shadow-sm'}`}
-            >
-              {showMarkerLabels ? '显示中' : '已隐藏'}
-            </button>
-          </div>
+          {isMobile && !isMobileSidebarExpanded && (
+            <p className="mt-2 text-xs text-gray-500">展开后可搜索办公地点、查看列表并长按拖动高度</p>
+          )}
         </div>
 
-        <div className="flex-1 space-y-3 overflow-y-auto bg-gray-50/50 p-3 md:space-y-4 md:p-4">
-          <div className="flex justify-between gap-3 px-2 pb-1 text-xs font-medium text-gray-500">
-            <span>共找到 {displayProperties.length} 个低租金青年公寓项目</span>
-            {companyLocation && <span>按距离由近及远排序</span>}
-          </div>
-
-          {displayProperties.map((project) => (
-            <div
-              key={project.projectId}
-              onClick={() => {
-                setSelectedProperty(project)
-                setCurrentImageIndex(0)
-                setGalleryType('images')
-                mapInstanceRef.current?.panTo([project.x, project.y])
-              }}
-              className={`group cursor-pointer rounded-xl border-2 bg-white p-3 transition-all hover:border-blue-200 hover:shadow-lg md:p-4 ${
-                selectedProperty?.projectId === project.projectId
-                  ? 'border-blue-500 shadow-md'
-                  : 'border-transparent shadow-sm'
-              }`}
-            >
-              <div className="flex gap-3 md:gap-4">
-                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-gray-100 md:h-24 md:w-24">
-                  {getMainImage(project) ? (
-                    <img
-                      src={getMainImage(project)}
-                      alt={getProjectName(project)}
-                      className="h-full w-full object-cover transition duration-500 group-hover:scale-110"
-                      onError={(event) => {
-                        event.currentTarget.style.display = 'none'
-                      }}
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-gray-300">
-                      <ImageIcon size={24} />
-                    </div>
-                  )}
-                  {companyLocation && project.distanceToCompany !== undefined && (
-                    <div className="absolute left-0 top-0 rounded-br-lg bg-orange-500/90 px-1.5 py-0.5 text-[10px] font-bold text-white backdrop-blur">
-                      {project.distanceToCompany < 1
-                        ? '<1 km'
-                        : `${project.distanceToCompany.toFixed(1)} km`}
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex min-w-0 flex-1 flex-col justify-between py-0.5">
-                  <div>
-                    <h3 className="truncate pr-2 text-base font-bold text-gray-900" title={getProjectName(project)}>
-                      {getProjectName(project)}
-                    </h3>
-                    <div className="mt-1 flex items-center gap-1 truncate text-xs text-gray-500">
-                      <MapPin size={12} className="shrink-0" />
-                      <span className="truncate">
-                        {project.streetOfficeName} | {project.zoneName}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {project.globaltype2Name && (
-                      <span className="rounded border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] text-blue-600">
-                        {project.globaltype2Name}
-                      </span>
-                    )}
-                    {project.projectStatusName && (
-                      <span className="rounded border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[10px] text-emerald-600">
-                        {project.projectStatusName}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="mt-2 text-sm font-bold text-red-500">{project.jgqj || '暂无报价'}</div>
-                </div>
+        {(!isMobile || isMobileSidebarExpanded) && (
+          <>
+            <div className="flex-1 space-y-3 overflow-y-auto bg-gray-50/50 p-3 md:space-y-4 md:p-4">
+              <div className="flex justify-between gap-3 px-2 pb-1 text-xs font-medium text-gray-500">
+                <span>共找到 {displayProperties.length} 个低租金青年公寓项目</span>
+                {companyLocation && <span>按距离由近及远排序</span>}
               </div>
+
+              {displayProperties.map((project) => (
+                <div
+                  key={project.projectId}
+                  onClick={() => {
+                    setSelectedProperty(project)
+                    setCurrentImageIndex(0)
+                    setGalleryType('images')
+                    mapInstanceRef.current?.panTo([project.x, project.y])
+                  }}
+                  className={`group cursor-pointer rounded-xl border-2 bg-white p-3 transition-all hover:border-blue-200 hover:shadow-lg md:p-4 ${
+                    selectedProperty?.projectId === project.projectId
+                      ? 'border-blue-500 shadow-md'
+                      : 'border-transparent shadow-sm'
+                  }`}
+                >
+                  <div className="flex gap-3 md:gap-4">
+                    <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-gray-100 md:h-24 md:w-24">
+                      {getMainImage(project) ? (
+                        <img
+                          src={getMainImage(project)}
+                          alt={getProjectName(project)}
+                          className="h-full w-full object-cover transition duration-500 group-hover:scale-110"
+                          onError={(event) => {
+                            event.currentTarget.style.display = 'none'
+                          }}
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-gray-300">
+                          <ImageIcon size={24} />
+                        </div>
+                      )}
+                      {companyLocation && project.distanceToCompany !== undefined && (
+                        <div className="absolute left-0 top-0 rounded-br-lg bg-orange-500/90 px-1.5 py-0.5 text-[10px] font-bold text-white backdrop-blur">
+                          {project.distanceToCompany < 1
+                            ? '<1 km'
+                            : `${project.distanceToCompany.toFixed(1)} km`}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex min-w-0 flex-1 flex-col justify-between py-0.5">
+                      <div>
+                        <h3 className="truncate pr-2 text-base font-bold text-gray-900" title={getProjectName(project)}>
+                          {getProjectName(project)}
+                        </h3>
+                        <div className="mt-1 flex items-center gap-1 truncate text-xs text-gray-500">
+                          <MapPin size={12} className="shrink-0" />
+                          <span className="truncate">
+                            {project.streetOfficeName} | {project.zoneName}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {project.globaltype2Name && (
+                          <span className="rounded border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] text-blue-600">
+                            {project.globaltype2Name}
+                          </span>
+                        )}
+                        {project.projectStatusName && (
+                          <span className="rounded border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[10px] text-emerald-600">
+                            {project.projectStatusName}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="mt-2 text-sm font-bold text-red-500">{project.jgqj || '暂无报价'}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+
+            {isMobile && (
+              <button
+                type="button"
+                onPointerDown={handleMobileResizeStart}
+                className="flex items-center justify-center gap-2 border-t border-gray-100 bg-white py-2 text-[11px] font-medium text-gray-400"
+              >
+                <span className="h-1.5 w-10 rounded-full bg-gray-300" />
+                长按拖动调整区域
+              </button>
+            )}
+          </>
+        )}
       </div>
 
       <div className="relative min-h-0 flex-1 bg-gray-200">
